@@ -5,22 +5,27 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Test {
     public static void main(String[] args) {
-        long[] res = new long[21];
-        for(int x = 0; x < 10; x++){
-            for(int i = 1; i <= 20; i++){
-                Testlock testlock = new Testlock();
-                for(int j = 0; j < i; j++){
-                    new Thread(testlock).start();
-                }
-                try {
-                    Thread.sleep(1000);
-                    res[i] += testlock.getruntime();
-                } catch (InterruptedException e) {
+        int tn = 10;
+        long[] res = new long[tn + 1];
+        for(int i = 1; i <= tn; i++){
+            Testlock testlock = new Testlock();
+            List<Thread> ts = new ArrayList<Thread>();
+            for(int j = 0; j < i; j++){
+                ts.add(new Thread(testlock));
+            }
+            long startTime = System.currentTimeMillis();
+            ts.forEach(Thread::start);
+            ts.forEach(t -> {                    
+                try{
+                    t.join();
+                }catch(InterruptedException e) {
                     e.printStackTrace();
                 }
-            }
+            });
+            long endtime = System.currentTimeMillis();
+            res[i] += endtime - startTime;
         }
-        for(int i = 1; i <= 20; i++){
+        for(int i = 1; i <= tn; i++){
             System.out.println(i + ":" + res[i]);
         }
     }
@@ -28,8 +33,6 @@ public class Test {
 
 class Testlock implements Runnable {
     int ticketNums = 1000000;
-    long startTime = System.currentTimeMillis();
-    long endTime = 0;
     //定义lock锁
     private final BackoffLock lock = new BackoffLock();
     @Override
@@ -47,9 +50,5 @@ class Testlock implements Runnable {
                 lock.unlock();
             }
         }
-        endTime = System.currentTimeMillis();
-    }
-    public long getruntime(){
-        return endTime - startTime;
     }
 }

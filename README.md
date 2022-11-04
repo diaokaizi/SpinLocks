@@ -1,4 +1,8 @@
-# SpinLocks
+---
+title: 自旋锁
+date: 2022-10-07 20:52:46
+tags:
+---
 ### Test-and-Set Lock
 
 最基本的锁，每个线程共用一把锁，进入临界区之前看没有有线程在临界区，如果没有，则进入，并上锁，如果有则等待。AtomicBoolean的原子特性保证一次只有一个线程可以获得到锁。
@@ -145,6 +149,60 @@ class Testlock implements Runnable {
 }
 ```
 
+上面的计时有问题，应该对任务统一计时：
+
+```java
+public class Test {
+    public static void main(String[] args) {
+        int tn = 10;
+        long[] res = new long[tn + 1];
+        for(int i = 1; i <= tn; i++){
+            Testlock testlock = new Testlock();
+            List<Thread> ts = new ArrayList<Thread>();
+            for(int j = 0; j < i; j++){
+                ts.add(new Thread(testlock));
+            }
+            long startTime = System.currentTimeMillis();
+            ts.forEach(Thread::start);
+            ts.forEach(t -> {                    
+                try{
+                    t.join();
+                }catch(InterruptedException e) {
+                    e.printStackTrace();
+                }
+            });
+            long endtime = System.currentTimeMillis();
+            res[i] += endtime - startTime;
+        }
+        for(int i = 1; i <= tn; i++){
+            System.out.println(i + ":" + res[i]);
+        }
+    }
+}
+
+class Testlock implements Runnable {
+    int ticketNums = 1000000;
+    //定义lock锁
+    private final BackoffLock lock = new BackoffLock();
+    @Override
+    public void run() {
+        while (true) {
+            //加锁
+            lock.lock();
+            try {
+                if (ticketNums>0){
+                    ticketNums--;
+                }
+                else break;
+            }finally {
+                //解锁
+                lock.unlock();
+            }
+        }
+    }
+}
+```
+
 最后得到如下结果：
 
 <img src="https://cdn.jsdelivr.net/gh/diaokaizi/image@main/image-20221007204425768.png" alt="image-20221007204425768" style="zoom:67%;" />
@@ -152,3 +210,4 @@ class Testlock implements Runnable {
 随着线程数的增加，耗时也呈增加的趋势，且整体耗时TAS>TTAS>Backoff。
 
 TAS算法存在着大量的总线占用，每个线程每一次自旋都会产生大量的总线流量，从而延迟其他线程。TTAS 的优势在于第一步只尝试读取数据，每次都从CPU cache 中进行读取，而不会占用总线。Backoff使用的办法是让尝试获取锁没有成功的线程 后退一段时间之后,再去尝试获取锁,由此来降低争用。
+
